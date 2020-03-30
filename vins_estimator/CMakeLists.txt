@@ -31,7 +31,16 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )
 
-catkin_package()
+catkin_package(INCLUDE_DIRS src
+  LIBRARIES vins_lib
+  CATKIN_DEPENDS roscpp
+  std_msgs
+  geometry_msgs
+  nav_msgs
+  tf
+  cv_bridge
+  camera_models
+  image_transport)
 
 add_library(vins_lib
     src/estimator/parameters.cpp
@@ -55,6 +64,9 @@ target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRAR
 
 add_executable(vins_node src/rosNodeTest.cpp)
 target_link_libraries(vins_node vins_lib) 
+
+add_executable(vins_odom_node src/rosNodeOdomTest.cpp)
+target_link_libraries(vins_odom_node vins_lib)
 
 add_executable(kitti_odom_test src/KITTIOdomTest.cpp)
 target_link_libraries(kitti_odom_test vins_lib) 
