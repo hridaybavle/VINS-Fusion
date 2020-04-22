@@ -51,6 +51,7 @@ public:
     void inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame);
     void inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
+    void processIMUWhOdom(double t, double dt, const double linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
     void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header);
     void processMeasurements();
     void changeSensorType(int use_imu, int use_stereo);
@@ -69,6 +70,8 @@ public:
     bool failureDetection();
     bool getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector,
                         vector<pair<double, Eigen::Vector3d>> &gyrVector);
+    bool getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, double> > &velVector, vector<pair<double, Eigen::Vector3d>> &accVector,
+                               vector<pair<double, Eigen::Vector3d>> &gyrVector);
     void getPoseInWorldFrame(Eigen::Matrix4d &T);
     void getPoseInWorldFrame(int index, Eigen::Matrix4d &T);
     void predictPtsInNextFrame();
@@ -121,6 +124,7 @@ public:
     Matrix3d        Rs[(WINDOW_SIZE + 1)];
     Vector3d        Bas[(WINDOW_SIZE + 1)];
     Vector3d        Bgs[(WINDOW_SIZE + 1)];
+    Matrix3d        R0_;
     double td;
 
     Matrix3d back_R0, last_R, last_R0;

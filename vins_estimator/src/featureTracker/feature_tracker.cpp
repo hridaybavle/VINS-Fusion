@@ -1,8 +1,8 @@
 /*******************************************************
  * Copyright (C) 2019, Aerial Robotics Group, Hong Kong University of Science and Technology
- * 
+ *
  * This file is part of VINS.
- * 
+ *
  * Licensed under the GNU General Public License v3.0;
  * you may not use this file except in compliance with the License.
  *
@@ -117,9 +117,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         if(hasPrediction)
         {
             cur_pts = predict_pts;
-            cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 1, 
+            cv::calcOpticalFlowPyrLK(prev_img, cur_img, prev_pts, cur_pts, status, err, cv::Size(21, 21), 1,
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
-            
+
             int succ_num = 0;
             for (size_t i = 0; i < status.size(); i++)
             {
@@ -136,9 +136,9 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         {
             vector<uchar> reverse_status;
             vector<cv::Point2f> reverse_pts = prev_pts;
-            cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 1, 
+            cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 1,
             cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS, 30, 0.01), cv::OPTFLOW_USE_INITIAL_FLOW);
-            //cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 3); 
+            //cv::calcOpticalFlowPyrLK(cur_img, prev_img, cur_pts, reverse_pts, reverse_status, err, cv::Size(21, 21), 3);
             for(size_t i = 0; i < status.size(); i++)
             {
                 if(status[i] && reverse_status[i] && distance(prev_pts[i], reverse_pts[i]) <= 0.5)
@@ -149,7 +149,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
                     status[i] = 0;
             }
         }
-        
+
         for (int i = 0; i < int(cur_pts.size()); i++)
             if (status[i] && !inBorder(cur_pts[i]))
                 status[i] = 0;
@@ -260,6 +260,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
     for (size_t i = 0; i < ids.size(); i++)
     {
+      if(!std::isnan(cur_un_pts[i].x) && !std::isnan(cur_un_pts[i].y))
+      {
         int feature_id = ids[i];
         double x, y ,z;
         x = cur_un_pts[i].x;
@@ -276,12 +278,15 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
         xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
         featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
+      }
     }
 
     if (!_img1.empty() && stereo_cam)
     {
         for (size_t i = 0; i < ids_right.size(); i++)
         {
+          if(!std::isnan(cur_un_right_pts[i].x) && !std::isnan(cur_un_right_pts[i].y))
+          {
             int feature_id = ids_right[i];
             double x, y ,z;
             x = cur_un_right_pts[i].x;
@@ -298,6 +303,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
             xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
             featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
+          }
         }
     }
 
@@ -415,7 +421,7 @@ vector<cv::Point2f> FeatureTracker::ptsVelocity(vector<int> &ids, vector<cv::Poi
     if (!prev_id_pts.empty())
     {
         double dt = cur_time - prev_time;
-        
+
         for (unsigned int i = 0; i < pts.size(); i++)
         {
             std::map<int, cv::Point2f>::iterator it;
@@ -443,7 +449,7 @@ vector<cv::Point2f> FeatureTracker::ptsVelocity(vector<int> &ids, vector<cv::Poi
 
 void FeatureTracker::drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight, 
                                vector<int> &curLeftIds,
-                               vector<cv::Point2f> &curLeftPts, 
+                               vector<cv::Point2f> &curLeftPts,
                                vector<cv::Point2f> &curRightPts,
                                map<int, cv::Point2f> &prevLeftPtsMap)
 {
@@ -471,7 +477,7 @@ void FeatureTracker::drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight,
             //cv::line(imTrack, leftPt, rightPt, cv::Scalar(0, 255, 0), 1, 8, 0);
         }
     }
-    
+
     map<int, cv::Point2f>::iterator mapIt;
     for (size_t i = 0; i < curLeftIds.size(); i++)
     {

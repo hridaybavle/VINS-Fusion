@@ -43,7 +43,7 @@ main( int argc, char** argv )
     "prefix,p",
     boost::program_options::value< std::string >( &prefix )->default_value( "left-" ),
     "Prefix of images" )( "file-extension,e",
-                          boost::program_options::value< std::string >( &fileExtension )->default_value( ".png" ),
+                          boost::program_options::value< std::string >( &fileExtension )->default_value( ".jpg" ),
                           "File extension of images" )(
     "camera-model",
     boost::program_options::value< std::string >( &cameraModel )->default_value( "mei" ),

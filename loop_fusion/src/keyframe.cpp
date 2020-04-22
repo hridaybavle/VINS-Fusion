@@ -488,7 +488,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
 	    //printf("PNP relative\n");
 	    //cout << "pnp relative_t " << relative_t.transpose() << endl;
 	    //cout << "pnp relative_yaw " << relative_yaw << endl;
-	    if (abs(relative_yaw) < 30.0 && relative_t.norm() < 20.0)
+      if (abs(relative_yaw) < YAW_THRES && relative_t.norm() < T_THRES)
 	    {
 
 	    	has_loop = true;

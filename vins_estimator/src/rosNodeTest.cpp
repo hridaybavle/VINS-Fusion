@@ -1,8 +1,8 @@
 /*******************************************************
  * Copyright (C) 2019, Aerial Robotics Group, Hong Kong University of Science and Technology
- * 
+ *
  * This file is part of VINS.
- * 
+ *
  * Licensed under the GNU General Public License v3.0;
  * you may not use this file except in compliance with the License.
  *
@@ -141,9 +141,30 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
     double rx = imu_msg->angular_velocity.x;
     double ry = imu_msg->angular_velocity.y;
     double rz = imu_msg->angular_velocity.z;
+
+//    Matrix3d r;
+//    r << 0, 0, 1,
+//        -1, 0, 0,
+//         0,-1, 0;
+
+//    Matrix3d r;
+//    r << 0, 0, 1,
+//         1, 0, 0,
+//         0, 1, 0;
+
+//    Eigen::Vector3d acc_cam, acc_base_link;
+//    acc_cam << dx, dy, dz;
+//    acc_base_link = r * acc_cam;
+
+//    Eigen::Vector3d gyro_cam, gyro_base_link;
+//    gyro_cam << rx, ry, rz;
+//    gyro_base_link = r * gyro_cam;
+
     Vector3d acc(dx, dy, dz);
     Vector3d gyr(rx, ry, rz);
     estimator.inputIMU(t, acc, gyr);
+    //estimator.inputIMU(t,acc_base_link, gyro_base_link);
+
     return;
 }
 
@@ -240,6 +261,12 @@ int main(int argc, char **argv)
 
     readParameters(config_file);
     estimator.setParameter();
+
+//    Matrix3d r;
+//    r << 0.8678192, 0, 0.4968801,
+//         0, 1, 0,
+//        -0.4968801, 0, 0.8678192;
+//    estimator.initFirstPose(Eigen::Vector3d(0,0,0),r);
 
 #ifdef EIGEN_DONT_PARALLELIZE
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");
