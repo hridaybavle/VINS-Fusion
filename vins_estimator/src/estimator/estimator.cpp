@@ -16,6 +16,7 @@ Estimator::Estimator(): f_manager{Rs}
   for(int i=0; i<WINDOW_SIZE+1; ++i)
   {
     pre_integrations[i] = nullptr;
+    pre_wh_odom_integration[i] = nullptr;
   }
   tmp_pre_integration = nullptr;
   last_marginalization_info = nullptr;
@@ -67,6 +68,13 @@ void Estimator::clearState()
       delete pre_integrations[i];
     }
     pre_integrations[i] = nullptr;
+
+    if (pre_wh_odom_integration[i] != nullptr)
+    {
+      delete pre_wh_odom_integration[i];
+    }
+    pre_wh_odom_integration[i] = nullptr;
+
   }
 
   for (int i = 0; i < NUM_OF_CAM; i++)
@@ -504,6 +512,7 @@ void Estimator::processIMUWhOdom(double t, double dt, const Vector3d linear_vel,
     //pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
     //adding wh odom measurements
     pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, vel_0, Bas[frame_count], Bgs[frame_count], R0_};
+    pre_wh_odom_integration[frame_count] = new WhOdomIntegrationBase();
   }
   if (frame_count != 0)
   {
@@ -511,6 +520,7 @@ void Estimator::processIMUWhOdom(double t, double dt, const Vector3d linear_vel,
     //if(solver_flag != NON_LINEAR)
     //tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity);
     pre_integrations[frame_count]->push_back_imu_wh_odom(dt, linear_acceleration, angular_velocity, linear_vel - vel_0);
+    pre_wh_odom_integration[frame_count]->push_back(dt, linear_vel);
     tmp_pre_integration->push_back_imu_wh_odom(dt, linear_acceleration, angular_velocity, linear_vel - vel_0);
 
     dt_buf[frame_count].push_back(dt);
@@ -1198,6 +1208,27 @@ void Estimator::optimization()
         continue;
       IMUFactor* imu_factor = new IMUFactor(pre_integrations[j]);
       problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
+
+
+      double vel_i[3], vel_j[3], quat_d[4];
+      vel_i[0] = para_SpeedBias[i][0]; vel_i[1] = para_SpeedBias[i][1]; vel_i[2] = para_SpeedBias[i][2];
+      vel_j[0] = para_SpeedBias[j][0]; vel_i[1] = para_SpeedBias[j][1]; vel_i[2] = para_SpeedBias[j][2];
+      Eigen::Quaterniond quat_cam;
+      quat_cam.x() = para_Pose[i][3];
+      quat_cam.y() = para_Pose[i][4];
+      quat_cam.z() = para_Pose[i][5];
+      quat_cam.w() = para_Pose[i][6];
+
+      Eigen::Quaterniond quat_trans(quat_cam.toRotationMatrix() * R0_.transpose());
+      quat_d[0] = quat_trans.x(); quat_d[1] = quat_trans.y(); quat_d[2] = quat_trans.z(); quat_d[3] = quat_trans.w();
+
+      std::cout << "quat_d:" << quat_d[0] << quat_d[1] << quat_d[2] << quat_d[3] << std::endl;
+      std::cout << "vel_i:" << vel_i[0] << vel_i[1] << vel_i[2] << std::endl;
+      std::cout << "vel_j:" << vel_j[0] << vel_j[0] << vel_j[2] << std::endl;
+
+      problem.AddParameterBlock(vel_i, 3);
+      whOdomFactor* wh_odom_factor = new whOdomFactor(pre_wh_odom_integration[j]);
+      //problem.AddResidualBlock(wh_odom_factor, NULL, vel_i, vel_j);
     }
   }
 
@@ -1265,8 +1296,9 @@ void Estimator::optimization()
     options.max_solver_time_in_seconds = SOLVER_TIME;
   TicToc t_solver;
   ceres::Solver::Summary summary;
+  cout << "optimizing" << endl;
   ceres::Solve(options, &problem, &summary);
-  //cout << summary.BriefReport() << endl;
+  cout << summary.BriefReport() << endl;
   ROS_DEBUG("Iterations : %d", static_cast<int>(summary.iterations.size()));
   //printf("solver costs: %f \n", t_solver.toc());
 

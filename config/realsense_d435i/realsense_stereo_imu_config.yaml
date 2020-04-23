@@ -17,7 +17,7 @@ image_height: 480
    
 
 # Extrinsic parameter between IMU and Camera.
-estimate_extrinsic: 0   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't schange it.
+estimate_extrinsic: 0   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
                         # 1  Have an initial guess about extrinsic parameters. We will optimize around your initial guess.
 
 body_T_cam0: !!opencv-matrix
@@ -29,7 +29,7 @@ body_T_cam0: !!opencv-matrix
           0, 0, 1, 0.012,
           0, 0, 0, 1]
 
-body_T_cam1: !!opencv-matrix 	
+body_T_cam1: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d

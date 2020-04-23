@@ -44,7 +44,7 @@ class IntegrationBase
             sum_dt{0.0}, delta_p{Eigen::Vector3d::Zero()}, delta_q{Eigen::Quaterniond::Identity()}, delta_v{Eigen::Vector3d::Zero()}, r_cam{_r_cam}
 
     {
-        covariance.block<3,3>(3,3) = Eigen::Matrix3d::Identity() * 10;
+        //covariance.block<3,3>(3,3) = Eigen::Matrix3d::Identity() * 10;
         noise = Eigen::Matrix<double, 18, 18>::Zero();
         noise.block<3, 3>(0, 0) =  (ACC_N * ACC_N) * Eigen::Matrix3d::Identity();
         noise.block<3, 3>(3, 3) =  (GYR_N * GYR_N) * Eigen::Matrix3d::Identity();
