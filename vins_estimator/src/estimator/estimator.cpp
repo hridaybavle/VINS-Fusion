@@ -60,6 +60,7 @@ void Estimator::clearState()
     dt_buf[i].clear();
     linear_acceleration_buf[i].clear();
     angular_velocity_buf[i].clear();
+    linear_vel_buf[i].clear();
 
     if (pre_integrations[i] != nullptr)
     {
@@ -219,7 +220,7 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
   }
 }
 
-void Estimator::inputIMUWhOdom(double t, double linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)
+void Estimator::inputIMUWhOdom(double t, const Vector3d linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)
 {
   mBuf.lock();
   accBuf.push(make_pair(t, linearAcceleration));
@@ -283,7 +284,7 @@ bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::
   return true;
 }
 
-bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, double>> &velVector,
+bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, Vector3d> > &velVector,
                                       vector<pair<double, Eigen::Vector3d> > &accVector, vector<pair<double, Eigen::Vector3d> > &gyrVector)
 {
   if(accBuf.empty())
@@ -337,7 +338,7 @@ void Estimator::processMeasurements()
     //printf("process measurments\n");
     pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
     vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
-    vector<pair<double, double>> velVec;
+    vector<pair<double, Eigen::Vector3d>> velVec;
     if(!featureBuf.empty())
     {
       feature = featureBuf.front();
@@ -488,28 +489,34 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
   gyr_0 = angular_velocity;
 }
 
-void Estimator::processIMUWhOdom(double t, double dt, const double linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
+void Estimator::processIMUWhOdom(double t, double dt, const Vector3d linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
 {
   if (!first_imu)
   {
     first_imu = true;
     acc_0 = linear_acceleration;
     gyr_0 = angular_velocity;
+    vel_0 = linear_vel;
   }
 
   if (!pre_integrations[frame_count])
   {
-    pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
+    //pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
+    //adding wh odom measurements
+    pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, vel_0, Bas[frame_count], Bgs[frame_count], R0_};
   }
   if (frame_count != 0)
   {
-    pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity);
+    //pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity);
     //if(solver_flag != NON_LINEAR)
-    tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity);
+    //tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity);
+    pre_integrations[frame_count]->push_back_imu_wh_odom(dt, linear_acceleration, angular_velocity, linear_vel - vel_0);
+    tmp_pre_integration->push_back_imu_wh_odom(dt, linear_acceleration, angular_velocity, linear_vel - vel_0);
 
     dt_buf[frame_count].push_back(dt);
     linear_acceleration_buf[frame_count].push_back(linear_acceleration);
     angular_velocity_buf[frame_count].push_back(angular_velocity);
+    linear_vel_buf[frame_count].push_back(linear_vel);
 
     int j = frame_count;
     Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g;
@@ -518,12 +525,15 @@ void Estimator::processIMUWhOdom(double t, double dt, const double linear_vel, c
     Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - g;
     Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
     //adding wh odom vel
-    Eigen::Vector3d un_vel = Eigen::Vector3d(0, linear_vel, 0);
+    //Eigen::Vector3d un_vel = Eigen::Vector3d(0, linear_vel, 0);
     Eigen::Quaterniond trans_Q(Rs[j] * R0_.transpose());
-    un_vel = trans_Q * un_vel;
-    std::cout << "R0_" << R0_ << std::endl;
-    std::cout << "trans Q: " << trans_Q.x() << "," << trans_Q.y() << "," << trans_Q.z() << "," << trans_Q.w() << std::endl;
-    std::cout << "un vel: " << un_vel << std::endl;
+    Vector3d un_vel_0 = trans_Q * vel_0;
+    Vector3d un_vel_1 = trans_Q * linear_vel;
+
+    Vector3d un_vel = 0.5 * (un_vel_0 + un_vel_1);
+    //    std::cout << "R0_" << R0_ << std::endl;
+    //    std::cout << "trans Q: " << trans_Q.x() << "," << trans_Q.y() << "," << trans_Q.z() << "," << trans_Q.w() << std::endl;
+    //std::cout << "un vel: " << un_vel << std::endl;
 
     //Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
     //Vs[j] += dt * un_acc;
@@ -532,6 +542,7 @@ void Estimator::processIMUWhOdom(double t, double dt, const double linear_vel, c
   }
   acc_0 = linear_acceleration;
   gyr_0 = angular_velocity;
+  vel_0 = linear_vel;
 }
 
 void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header)
@@ -557,7 +568,8 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
   ImageFrame imageframe(image, header);
   imageframe.pre_integration = tmp_pre_integration;
   all_image_frame.insert(make_pair(header, imageframe));
-  tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
+  //tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
+  tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, vel_0, Bas[frame_count], Bgs[frame_count], R0_};
 
   if(ESTIMATE_EXTRINSIC == 2)
   {
@@ -621,7 +633,8 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         solveGyroscopeBias(all_image_frame, Bgs);
         for (int i = 0; i <= WINDOW_SIZE; i++)
         {
-          pre_integrations[i]->repropagate(Vector3d::Zero(), Bgs[i]);
+          //pre_integrations[i]->repropagate(Vector3d::Zero(), Bgs[i]);
+          pre_integrations[i]->repropagateIMUWhodom(Vector3d::Zero(), Bgs[i]);
         }
         optimization();
         updateLatestStates();
@@ -874,7 +887,8 @@ bool Estimator::visualInitialAlign()
   double s = (x.tail<1>())(0);
   for (int i = 0; i <= WINDOW_SIZE; i++)
   {
-    pre_integrations[i]->repropagate(Vector3d::Zero(), Bgs[i]);
+    //pre_integrations[i]->repropagate(Vector3d::Zero(), Bgs[i]);
+    pre_integrations[i]->repropagateIMUWhodom(Vector3d::Zero(), Bgs[i]);
   }
   for (int i = frame_count; i >= 0; i--)
     Ps[i] = s * Ps[i] - Rs[i] * TIC[0] - (s * Ps[0] - Rs[0] * TIC[0]);
@@ -1474,6 +1488,7 @@ void Estimator::slideWindow()
           dt_buf[i].swap(dt_buf[i + 1]);
           linear_acceleration_buf[i].swap(linear_acceleration_buf[i + 1]);
           angular_velocity_buf[i].swap(angular_velocity_buf[i + 1]);
+          linear_vel_buf[i].swap(linear_vel_buf[i+1]);
 
           Vs[i].swap(Vs[i + 1]);
           Bas[i].swap(Bas[i + 1]);
@@ -1491,11 +1506,15 @@ void Estimator::slideWindow()
         Bgs[WINDOW_SIZE] = Bgs[WINDOW_SIZE - 1];
 
         delete pre_integrations[WINDOW_SIZE];
-        pre_integrations[WINDOW_SIZE] = new IntegrationBase{acc_0, gyr_0, Bas[WINDOW_SIZE], Bgs[WINDOW_SIZE]};
+        //pre_integrations[WINDOW_SIZE] = new IntegrationBase{acc_0, gyr_0, Bas[WINDOW_SIZE], Bgs[WINDOW_SIZE]};
+        pre_integrations[WINDOW_SIZE] = new IntegrationBase{acc_0, gyr_0, vel_0, Bas[WINDOW_SIZE], Bgs[WINDOW_SIZE], R0_};
+
 
         dt_buf[WINDOW_SIZE].clear();
         linear_acceleration_buf[WINDOW_SIZE].clear();
         angular_velocity_buf[WINDOW_SIZE].clear();
+        linear_vel_buf[WINDOW_SIZE].clear();
+
       }
 
       if (true || solver_flag == INITIAL)
@@ -1523,12 +1542,16 @@ void Estimator::slideWindow()
           double tmp_dt = dt_buf[frame_count][i];
           Vector3d tmp_linear_acceleration = linear_acceleration_buf[frame_count][i];
           Vector3d tmp_angular_velocity = angular_velocity_buf[frame_count][i];
+          Vector3d tmp_linear_vel = linear_vel_buf[frame_count][i];
 
-          pre_integrations[frame_count - 1]->push_back(tmp_dt, tmp_linear_acceleration, tmp_angular_velocity);
+
+          //pre_integrations[frame_count - 1]->push_back(tmp_dt, tmp_linear_acceleration, tmp_angular_velocity);
+          pre_integrations[frame_count - 1]->push_back_imu_wh_odom(tmp_dt, tmp_linear_acceleration, tmp_angular_velocity, tmp_linear_vel - vel_0);
 
           dt_buf[frame_count - 1].push_back(tmp_dt);
           linear_acceleration_buf[frame_count - 1].push_back(tmp_linear_acceleration);
           angular_velocity_buf[frame_count - 1].push_back(tmp_angular_velocity);
+          linear_vel_buf[frame_count - 1].push_back(tmp_linear_vel);
         }
 
         Vs[frame_count - 1] = Vs[frame_count];
@@ -1536,11 +1559,13 @@ void Estimator::slideWindow()
         Bgs[frame_count - 1] = Bgs[frame_count];
 
         delete pre_integrations[WINDOW_SIZE];
-        pre_integrations[WINDOW_SIZE] = new IntegrationBase{acc_0, gyr_0, Bas[WINDOW_SIZE], Bgs[WINDOW_SIZE]};
+        //pre_integrations[WINDOW_SIZE] = new IntegrationBase{acc_0, gyr_0, Bas[WINDOW_SIZE], Bgs[WINDOW_SIZE]};
+        pre_integrations[WINDOW_SIZE] = new IntegrationBase{acc_0, gyr_0, vel_0, Bas[WINDOW_SIZE], Bgs[WINDOW_SIZE], R0_};
 
         dt_buf[WINDOW_SIZE].clear();
         linear_acceleration_buf[WINDOW_SIZE].clear();
         angular_velocity_buf[WINDOW_SIZE].clear();
+        linear_vel_buf[WINDOW_SIZE].clear();
       }
       slideWindowNew();
     }
@@ -1709,7 +1734,7 @@ void Estimator::fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Ei
   latest_gyr_0 = angular_velocity;
 }
 
-void Estimator::fastPredictIMUOdom(double t, double linearVel, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity)
+void Estimator::fastPredictIMUOdom(double t, Eigen::Vector3d linearVel, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity)
 {
   double dt = t - latest_time;
   latest_time = t;
@@ -1719,25 +1744,25 @@ void Estimator::fastPredictIMUOdom(double t, double linearVel, Eigen::Vector3d l
   Eigen::Vector3d un_acc_1 = latest_Q * (linear_acceleration - latest_Ba) - g;
   Eigen::Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
 
-  //std::cout << "lastest_Q: " << latest_Q.x() << "," << latest_Q.y() << "," << latest_Q.z() << "," << latest_Q.w() << std::endl;
-
-  Eigen::Quaterniond trans_Q(latest_Q.toRotationMatrix() * Rs[0].transpose());
-  //std::cout << "trans Q: " << trans_Q.x() << "," << trans_Q.y() << "," << trans_Q.z() << "," << trans_Q.w() << std::endl;
-
   //adding wh odom vel
-  Eigen::Vector3d un_vel = Eigen::Vector3d(0, linearVel, 0);
-  un_vel = trans_Q * un_vel;
+  //std::cout << "lastest_Q: " << latest_Q.x() << "," << latest_Q.y() << "," << latest_Q.z() << "," << latest_Q.w() << std::endl;
+  Eigen::Quaterniond trans_Q(latest_Q.toRotationMatrix() * R0_.transpose());
+  //std::cout << "trans Q: " << trans_Q.x() << "," << trans_Q.y() << "," << trans_Q.z() << "," << trans_Q.w() << std::endl;
+  Eigen::Vector3d un_vel_0 = trans_Q * latest_vel_0;
+  Eigen::Vector3d un_vel_1 = trans_Q * linearVel;
+  Eigen::Vector3d un_vel = 0.5 * (un_vel_0 + un_vel_1);
 
   //std::cout << "un vel: " << un_vel << std::endl;
   //std::cout << "latest V: " << latest_V << std::endl;
-
   //std::cout << "added wheel odom data in fastPredict" << std::endl;
 
   //latest_P = latest_P + dt * latest_V + 0.5 * dt * dt * un_acc;
+  //latest_V = latest_V + dt * un_acc;
   latest_P = latest_P + dt * un_vel + 0.5 * dt * dt * un_acc;
   latest_V = un_vel + dt * un_acc;
   latest_acc_0 = linear_acceleration;
   latest_gyr_0 = angular_velocity;
+  latest_vel_0 = linearVel;
 }
 
 void Estimator::updateLatestStates()

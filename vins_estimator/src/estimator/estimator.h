@@ -47,11 +47,11 @@ public:
     // interface
     void initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r);
     void inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
-    void inputIMUWhOdom(double t, double linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
+    void inputIMUWhOdom(double t, const Vector3d linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
     void inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame);
     void inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
-    void processIMUWhOdom(double t, double dt, const double linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
+    void processIMUWhOdom(double t, double dt, const Vector3d linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
     void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header);
     void processMeasurements();
     void changeSensorType(int use_imu, int use_stereo);
@@ -70,7 +70,7 @@ public:
     bool failureDetection();
     bool getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector,
                         vector<pair<double, Eigen::Vector3d>> &gyrVector);
-    bool getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, double> > &velVector, vector<pair<double, Eigen::Vector3d>> &accVector,
+    bool getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d> > &velVector, vector<pair<double, Eigen::Vector3d>> &accVector,
                                vector<pair<double, Eigen::Vector3d>> &gyrVector);
     void getPoseInWorldFrame(Eigen::Matrix4d &T);
     void getPoseInWorldFrame(int index, Eigen::Matrix4d &T);
@@ -81,7 +81,7 @@ public:
                              double depth, Vector3d &uvi, Vector3d &uvj);
     void updateLatestStates();
     void fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity);
-    void fastPredictIMUOdom(double t, double linearVel, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity);
+    void fastPredictIMUOdom(double t, Eigen::Vector3d linearVel, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity);
     bool IMUAvailable(double t);
     void initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector);
 
@@ -102,7 +102,7 @@ public:
     std::mutex mPropagate;
     queue<pair<double, Eigen::Vector3d>> accBuf;
     queue<pair<double, Eigen::Vector3d>> gyrBuf;
-    queue<pair<double, double>> velBuf;
+    queue<pair<double, Eigen::Vector3d>> velBuf;
     queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > > featureBuf;
     double prevTime, curTime;
     bool openExEstimation;
@@ -132,11 +132,12 @@ public:
     double Headers[(WINDOW_SIZE + 1)];
 
     IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)];
-    Vector3d acc_0, gyr_0;
+    Vector3d acc_0, gyr_0, vel_0;
 
     vector<double> dt_buf[(WINDOW_SIZE + 1)];
     vector<Vector3d> linear_acceleration_buf[(WINDOW_SIZE + 1)];
     vector<Vector3d> angular_velocity_buf[(WINDOW_SIZE + 1)];
+    vector<Vector3d> linear_vel_buf[(WINDOW_SIZE + 1)];
 
     int frame_count;
     int sum_of_outlier, sum_of_back, sum_of_front, sum_of_invalid;
@@ -176,7 +177,7 @@ public:
     Eigen::Matrix3d initR;
 
     double latest_time;
-    Eigen::Vector3d latest_P, latest_V, latest_Ba, latest_Bg, latest_acc_0, latest_gyr_0;
+    Eigen::Vector3d latest_P, latest_V, latest_Ba, latest_Bg, latest_acc_0, latest_gyr_0, latest_vel_0;
     Eigen::Quaterniond latest_Q;
 
     bool initFirstPoseFlag;
