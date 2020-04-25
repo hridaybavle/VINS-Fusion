@@ -21,12 +21,6 @@
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
 
-//time synchronization
-#include <message_filters/subscriber.h>
-#include <message_filters/synchronizer.h>
-#include <message_filters/sync_policies/approximate_time.h>
-#include <message_filters/sync_policies/exact_time.h>
-
 Estimator estimator;
 
 queue<sensor_msgs::ImuConstPtr> imu_buf;
@@ -131,7 +125,6 @@ void sync_process()
       if(!image.empty())
         estimator.inputImage(time, image);
     }
-
     std::chrono::milliseconds dura(2);
     std::this_thread::sleep_for(dura);
   }
@@ -164,7 +157,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
   get_wh_odom(wh_odom);
 
   double wh_odom_t = wh_odom.header.stamp.toSec();
-  if(wh_odom_t <= t)
+  if(wh_odom_t <= t && fabs(wh_odom.twist.twist.linear.x) < 10)
   {
     //std::cout << "time diff between odom and imu msg: " << t - wh_odom_t << std::endl;
     Eigen::Vector3d vel(0, wh_odom.twist.twist.linear.x, 0);
@@ -306,13 +299,7 @@ int main(int argc, char **argv)
 
   registerPub(n);
 
-  //time synchronizing imu and wheel odom
-  //  message_filters::Subscriber<sensor_msgs::Imu>   sub_imu_sync(n, IMU_TOPIC, 1, ros::TransportHints().tcpNoDelay());
-  //  message_filters::Subscriber<nav_msgs::Odometry> sub_wh_odom_sync(n, "/velocity_controller/odom", 1, ros::TransportHints().tcpNoDelay());
-
-  //  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Imu, nav_msgs::Odometry> imu_wh_odom_sync_policy;
-  //  message_filters::Synchronizer<imu_wh_odom_sync_policy> sync(imu_wh_odom_sync_policy(1), sub_imu_sync, sub_wh_odom_sync);
-  //  sync.registerCallback(boost::bind(&imu_wh_odom_callback, _1, _2));
+  USE_WH_ODOM = 1;
 
   //disabling imu only information
   ros::Subscriber sub_imu        = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());

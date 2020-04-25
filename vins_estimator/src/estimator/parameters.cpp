@@ -45,7 +45,7 @@ int MIN_DIST;
 double F_THRESHOLD;
 int SHOW_TRACK;
 int FLOW_BACK;
-
+int USE_WH_ODOM;
 
 template <typename T>
 T readParam(ros::NodeHandle &n, std::string name)

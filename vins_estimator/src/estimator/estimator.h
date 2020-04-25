@@ -35,8 +35,8 @@
 #include "../factor/projectionTwoFrameTwoCamFactor.h"
 #include "../factor/projectionOneFrameTwoCamFactor.h"
 #include "../featureTracker/feature_tracker.h"
-#include "../factor/wheel_odom_factor.h"
-#include"../factor/wheel_odom_integration_base.h"
+//#include "../factor/wheel_odom_factor.h"
+//#include"../factor/wheel_odom_integration_base.h"
 
 class Estimator
 {
@@ -135,13 +135,11 @@ public:
     IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)];
     Vector3d acc_0, gyr_0;
 
-    WhOdomIntegrationBase *pre_wh_odom_integration[(WINDOW_SIZE + 1)];
     Vector3d vel_0;
 
     vector<double> dt_buf[(WINDOW_SIZE + 1)];
     vector<Vector3d> linear_acceleration_buf[(WINDOW_SIZE + 1)];
     vector<Vector3d> angular_velocity_buf[(WINDOW_SIZE + 1)];
-    vector<Vector3d> linear_vel_buf[(WINDOW_SIZE + 1)];
 
     int frame_count;
     int sum_of_outlier, sum_of_back, sum_of_front, sum_of_invalid;

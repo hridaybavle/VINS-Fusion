@@ -27,6 +27,11 @@ class IntegrationBase
           sum_dt{0.0}, delta_p{Eigen::Vector3d::Zero()}, delta_q{Eigen::Quaterniond::Identity()}, delta_v{Eigen::Vector3d::Zero()}
 
     {
+        if(USE_WH_ODOM)
+        {
+          //covariance.block<3,3>(0,0) = 0 * Eigen::Matrix3d::Identity();
+          //covariance.block<3,3>(6,6) = 0.1 * Eigen::Matrix3d::Identity();
+        }
         noise = Eigen::Matrix<double, 18, 18>::Zero();
         noise.block<3, 3>(0, 0) =  (ACC_N * ACC_N) * Eigen::Matrix3d::Identity();
         noise.block<3, 3>(3, 3) =  (GYR_N * GYR_N) * Eigen::Matrix3d::Identity();
