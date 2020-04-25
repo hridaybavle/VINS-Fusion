@@ -540,8 +540,8 @@ void Estimator::processIMUWhOdom(double t, double dt, const Vector3d linear_vel,
 
     //Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
     //Vs[j] += dt * un_acc;
-    Ps[j] += dt * un_vel;
-    Vs[j]  = un_vel;
+    Ps[j] += dt * un_vel + 0.5 * dt * dt * un_acc;
+    Vs[j]  = un_vel + 0.5 * dt * dt * un_acc;
   }
   acc_0 = linear_acceleration;
   gyr_0 = angular_velocity;
