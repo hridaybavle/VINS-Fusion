@@ -35,7 +35,7 @@
 #include "../factor/projectionTwoFrameTwoCamFactor.h"
 #include "../factor/projectionOneFrameTwoCamFactor.h"
 #include "../featureTracker/feature_tracker.h"
-//#include "../factor/wheel_odom_factor.h"
+#include "../factor/wheel_odom_factor.h"
 //#include"../factor/wheel_odom_integration_base.h"
 
 class Estimator

@@ -108,9 +108,9 @@ void Estimator::setParameter()
     cout << " exitrinsic cam " << i << endl  << ric[i] << endl << tic[i].transpose() << endl;
   }
   f_manager.setRic(ric);
-  ProjectionTwoFrameOneCamFactor::sqrt_info = 100 * /*FOCAL_LENGTH / 1.5 **/ Matrix2d::Identity();
-  ProjectionTwoFrameTwoCamFactor::sqrt_info = 100 * /*FOCAL_LENGTH / 1.5 * */ Matrix2d::Identity();
-  ProjectionOneFrameTwoCamFactor::sqrt_info = 100 * /*FOCAL_LENGTH / 1.5 **/ Matrix2d::Identity();
+  ProjectionTwoFrameOneCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
+  ProjectionTwoFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
+  ProjectionOneFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
   td = TD;
   g = G;
   cout << "set g " << g.transpose() << endl;
@@ -560,6 +560,7 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
 
     //Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
     //Vs[j] += dt * un_acc;
+    //Eigen::Vector3d noise = 0.01 * Eigen::Vector3d::Ones();
     Ps[j] += dt_wh * un_vel;
     Vs[j]  = un_vel;
   }
@@ -1217,7 +1218,15 @@ void Estimator::optimization()
       if (pre_integrations[j]->sum_dt > 10.0)
         continue;
       IMUFactor* imu_factor = new IMUFactor(pre_integrations[j]);
-      problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);   
+      problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
+
+      if(USE_WH_ODOM)
+      {
+        ceres::CostFunction* cost_function
+            = new ceres::NumericDiffCostFunction<VelCostFunctor, ceres::CENTRAL, 3, 9, 9>(
+              new VelCostFunctor());
+        problem.AddResidualBlock(cost_function, NULL, para_SpeedBias[i], para_SpeedBias[j]);
+      }
     }
   }
 
@@ -1238,31 +1247,40 @@ void Estimator::optimization()
     for (auto &it_per_frame : it_per_id.feature_per_frame)
     {
       imu_j++;
-      if (imu_i != imu_j)
+      //not optimizing pixels which have high seperation between them
+      if(fabs(it_per_id.feature_per_frame[0].uv.x() - it_per_frame.uv.x()) < 10 &&
+         fabs(it_per_id.feature_per_frame[0].uv.y() - it_per_frame.uv.y() < 10))
       {
-        Vector3d pts_j = it_per_frame.point;
-        ProjectionTwoFrameOneCamFactor *f_td = new ProjectionTwoFrameOneCamFactor(pts_i, pts_j, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocity,
-            it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
-        problem.AddResidualBlock(f_td, loss_function, para_Pose[imu_i], para_Pose[imu_j], para_Ex_Pose[0], para_Feature[feature_index], para_Td[0]);
-      }
+        if (imu_i != imu_j)
+        {
+          Vector3d pts_j = it_per_frame.point;
+          ProjectionTwoFrameOneCamFactor *f_td = new ProjectionTwoFrameOneCamFactor(pts_i, pts_j, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocity,
+              it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
+          problem.AddResidualBlock(f_td, loss_function, para_Pose[imu_i], para_Pose[imu_j], para_Ex_Pose[0], para_Feature[feature_index], para_Td[0]);
 
-      if(STEREO && it_per_frame.is_stereo)
-      {
-        Vector3d pts_j_right = it_per_frame.pointRight;
-        if(imu_i != imu_j)
-        {
-          ProjectionTwoFrameTwoCamFactor *f = new ProjectionTwoFrameTwoCamFactor(pts_i, pts_j_right, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocityRight,
-              it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
-          problem.AddResidualBlock(f, loss_function, para_Pose[imu_i], para_Pose[imu_j], para_Ex_Pose[0], para_Ex_Pose[1], para_Feature[feature_index], para_Td[0]);
-        }
-        else
-        {
-          ProjectionOneFrameTwoCamFactor *f = new ProjectionOneFrameTwoCamFactor(pts_i, pts_j_right, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocityRight,
-              it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
-          problem.AddResidualBlock(f, loss_function, para_Ex_Pose[0], para_Ex_Pose[1], para_Feature[feature_index], para_Td[0]);
         }
 
+        if(STEREO && it_per_frame.is_stereo)
+        {
+          Vector3d pts_j_right = it_per_frame.pointRight;
+
+          if(imu_i != imu_j)
+          {
+            ProjectionTwoFrameTwoCamFactor *f = new ProjectionTwoFrameTwoCamFactor(pts_i, pts_j_right, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocityRight,
+                it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
+            problem.AddResidualBlock(f, loss_function, para_Pose[imu_i], para_Pose[imu_j], para_Ex_Pose[0], para_Ex_Pose[1], para_Feature[feature_index], para_Td[0]);
+          }
+          else
+          {
+            ProjectionOneFrameTwoCamFactor *f = new ProjectionOneFrameTwoCamFactor(pts_i, pts_j_right, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocityRight,
+                it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
+            problem.AddResidualBlock(f, loss_function, para_Ex_Pose[0], para_Ex_Pose[1], para_Feature[feature_index], para_Td[0]);
+          }
+
+        }
       }
+      else
+        std::cout << "rejecting points as outliers" << std::endl;
       f_m_cnt++;
     }
   }
@@ -1565,7 +1583,7 @@ void Estimator::slideWindow()
           dt_buf[frame_count - 1].push_back(tmp_dt);
           linear_acceleration_buf[frame_count - 1].push_back(tmp_linear_acceleration);
           angular_velocity_buf[frame_count - 1].push_back(tmp_angular_velocity);
-       }
+        }
 
         Vs[frame_count - 1] = Vs[frame_count];
         Bas[frame_count - 1] = Bas[frame_count];
