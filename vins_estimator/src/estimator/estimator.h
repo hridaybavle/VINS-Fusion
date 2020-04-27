@@ -48,11 +48,11 @@ public:
     // interface
     void initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r);
     void inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
-    void inputIMUWhOdom(double t, const Vector3d linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
+    void inputIMUWhOdom(double t, double t_wh, const Vector3d linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
     void inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame);
     void inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
-    void processIMUWhOdom(double t, double dt, const Vector3d linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
+    void processIMUWhOdom(double t, double dt, double dt_wh, const Vector3d linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
     void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header);
     void processMeasurements();
     void changeSensorType(int use_imu, int use_stereo);
@@ -82,7 +82,7 @@ public:
                              double depth, Vector3d &uvi, Vector3d &uvj);
     void updateLatestStates();
     void fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity);
-    void fastPredictIMUOdom(double t, Eigen::Vector3d linearVel, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity);
+    void fastPredictIMUOdom(double t, double t_wh, Eigen::Vector3d linearVel, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity);
     bool IMUAvailable(double t);
     void initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector);
 

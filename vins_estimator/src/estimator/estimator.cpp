@@ -108,9 +108,9 @@ void Estimator::setParameter()
     cout << " exitrinsic cam " << i << endl  << ric[i] << endl << tic[i].transpose() << endl;
   }
   f_manager.setRic(ric);
-  ProjectionTwoFrameOneCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
-  ProjectionTwoFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
-  ProjectionOneFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
+  ProjectionTwoFrameOneCamFactor::sqrt_info = 100 * /*FOCAL_LENGTH / 1.5 **/ Matrix2d::Identity();
+  ProjectionTwoFrameTwoCamFactor::sqrt_info = 100 * /*FOCAL_LENGTH / 1.5 * */ Matrix2d::Identity();
+  ProjectionOneFrameTwoCamFactor::sqrt_info = 100 * /*FOCAL_LENGTH / 1.5 **/ Matrix2d::Identity();
   td = TD;
   g = G;
   cout << "set g " << g.transpose() << endl;
@@ -219,18 +219,18 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
   }
 }
 
-void Estimator::inputIMUWhOdom(double t, const Vector3d linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)
+void Estimator::inputIMUWhOdom(double t, double t_wh, const Vector3d linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)
 {
   mBuf.lock();
   accBuf.push(make_pair(t, linearAcceleration));
   gyrBuf.push(make_pair(t, angularVelocity));
-  velBuf.push(make_pair(t, linearVel));
+  velBuf.push(make_pair(t_wh, linearVel));
   mBuf.unlock();
 
   if (solver_flag == NON_LINEAR)
   {
     mPropagate.lock();
-    fastPredictIMUOdom(t, linearVel, linearAcceleration, angularVelocity);
+    fastPredictIMUOdom(t, t_wh, linearVel, linearAcceleration, angularVelocity);
     pubLatestOdometry(latest_P, latest_Q, latest_V, t);
     mPropagate.unlock();
   }
@@ -299,7 +299,8 @@ bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, 
     {
       accBuf.pop();
       gyrBuf.pop();
-      velBuf.pop();
+      if(velBuf.front().first <= t0)
+        velBuf.pop();
     }
     while (accBuf.front().first < t1)
     {
@@ -307,7 +308,7 @@ bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, 
       accBuf.pop();
       gyrVector.push_back(gyrBuf.front());
       gyrBuf.pop();
-      if(!velBuf.empty())
+      if(velBuf.front().first < t1 && !velBuf.empty())
       {
         velVector.push_back(velBuf.front());
         velBuf.pop();
@@ -376,17 +377,34 @@ void Estimator::processMeasurements()
         {
           double dt;
           if(i == 0)
-            dt = accVector[i].first - prevTime;
+            dt    = accVector[i].first - prevTime;
           else if (i == accVector.size() - 1)
             dt = curTime - accVector[i - 1].first;
           else
             dt = accVector[i].first - accVector[i - 1].first;
+
+          double dt_wh;
+          if(USE_WH_ODOM)
+          {
+            if(i == 0)
+            {
+              if(i < velVec.size())
+                dt_wh  = velVec[i].first - prevTime;
+            }
+            else if (i == velVec.size() - 1)
+              dt_wh = curTime - velVec[i - 1].first;
+            else
+            {
+              if(i < velVec.size())
+                dt_wh = velVec[i].first - velVec[i - 1].first;
+            }
+          }
           if(USE_IMU && !USE_WH_ODOM)
             processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
           else
           {
             if(i < velVec.size())
-              processIMUWhOdom(accVector[i].first, dt, velVec[i].second, accVector[i].second, gyrVector[i].second);
+              processIMUWhOdom(accVector[i].first, dt, dt_wh, velVec[i].second, accVector[i].second, gyrVector[i].second);
             else
               processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
           }
@@ -498,7 +516,7 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
   gyr_0 = angular_velocity;
 }
 
-void Estimator::processIMUWhOdom(double t, double dt, const Vector3d linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
+void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector3d linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
 {
   if (!first_imu)
   {
@@ -529,7 +547,9 @@ void Estimator::processIMUWhOdom(double t, double dt, const Vector3d linear_vel,
     Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - g;
     Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
     //adding wh odom vel
-    Eigen::Quaterniond trans_Q(Rs[j] * R0_.transpose());
+    Matrix3d Rs_wh = Rs[j];
+    Rs_wh *= Utility::deltaQ(un_gyr * dt_wh).toRotationMatrix();
+    Eigen::Quaterniond trans_Q(Rs_wh * R0_.transpose());
     Vector3d un_vel_0 = trans_Q * vel_0;
     Vector3d un_vel_1 = trans_Q * linear_vel;
 
@@ -540,8 +560,8 @@ void Estimator::processIMUWhOdom(double t, double dt, const Vector3d linear_vel,
 
     //Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
     //Vs[j] += dt * un_acc;
-    Ps[j] += dt * un_vel + 0.5 * dt * dt * un_acc;
-    Vs[j]  = un_vel + 0.5 * dt * dt * un_acc;
+    Ps[j] += dt_wh * un_vel;
+    Vs[j]  = un_vel;
   }
   acc_0 = linear_acceleration;
   gyr_0 = angular_velocity;
@@ -1725,9 +1745,10 @@ void Estimator::fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Ei
   latest_gyr_0 = angular_velocity;
 }
 
-void Estimator::fastPredictIMUOdom(double t, Eigen::Vector3d linearVel, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity)
+void Estimator::fastPredictIMUOdom(double t, double t_wh, Eigen::Vector3d linearVel, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity)
 {
   double dt = t - latest_time;
+  double dt_wh = t_wh - latest_time;
   latest_time = t;
   Eigen::Vector3d un_acc_0 = latest_Q * (latest_acc_0 - latest_Ba) - g;
   Eigen::Vector3d un_gyr = 0.5 * (latest_gyr_0 + angular_velocity) - latest_Bg;
@@ -1749,7 +1770,7 @@ void Estimator::fastPredictIMUOdom(double t, Eigen::Vector3d linearVel, Eigen::V
 
   //latest_P = latest_P + dt * latest_V + 0.5 * dt * dt * un_acc;
   //latest_V = latest_V + dt * un_acc;
-  latest_P = latest_P + dt * un_vel + 0.5 * dt * dt * un_acc;
+  latest_P = latest_P + dt_wh * un_vel + 0.5 * dt * dt * un_acc;
   latest_V = un_vel + dt * un_acc;
   latest_acc_0 = linear_acceleration;
   latest_gyr_0 = angular_velocity;
