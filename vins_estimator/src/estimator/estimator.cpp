@@ -225,6 +225,7 @@ void Estimator::inputIMUWhOdom(double t, double t_wh, const Vector3d linearVel, 
   accBuf.push(make_pair(t, linearAcceleration));
   gyrBuf.push(make_pair(t, angularVelocity));
   velBuf.push(make_pair(t_wh, linearVel));
+  std::cout << "t_wh callback:" << t_wh << std::endl;
   mBuf.unlock();
 
   if (solver_flag == NON_LINEAR)
@@ -316,7 +317,8 @@ bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, 
     }
     accVector.push_back(accBuf.front());
     gyrVector.push_back(gyrBuf.front());
-    velVector.push_back(velBuf.front());
+    if(!velBuf.empty())
+      velVector.push_back(velBuf.front());
   }
   else
   {
@@ -383,7 +385,7 @@ void Estimator::processMeasurements()
           else
             dt = accVector[i].first - accVector[i - 1].first;
 
-          double dt_wh;
+          double dt_wh = 0;
           if(USE_WH_ODOM)
           {
             if(i == 0)
@@ -561,6 +563,7 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
     //Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
     //Vs[j] += dt * un_acc;
     //Eigen::Vector3d noise = 0.01 * Eigen::Vector3d::Ones();
+    std::cout << "dt_wh inside" << dt_wh << std::endl;
     Ps[j] += dt_wh * un_vel;
     Vs[j]  = un_vel;
   }
@@ -1225,7 +1228,7 @@ void Estimator::optimization()
         ceres::CostFunction* cost_function
             = new ceres::NumericDiffCostFunction<VelCostFunctor, ceres::CENTRAL, 3, 9, 9>(
               new VelCostFunctor());
-        problem.AddResidualBlock(cost_function, NULL, para_SpeedBias[i], para_SpeedBias[j]);
+        //problem.AddResidualBlock(cost_function, NULL, para_SpeedBias[i], para_SpeedBias[j]);
       }
     }
   }
@@ -1247,9 +1250,12 @@ void Estimator::optimization()
     for (auto &it_per_frame : it_per_id.feature_per_frame)
     {
       imu_j++;
-      //not optimizing pixels which have high seperation between them
-      if(fabs(it_per_id.feature_per_frame[0].uv.x() - it_per_frame.uv.x()) < 10 &&
-         fabs(it_per_id.feature_per_frame[0].uv.y() - it_per_frame.uv.y() < 10))
+      //dont optimize points which have really high displacement
+      //std::cout << "it_per_id.feature_per_frame[0].uv " << it_per_id.feature_per_frame[0].uv << std::endl;
+      //std::cout << "it_per_frame.uv " << it_per_frame.uv << std::endl;
+
+      //if(fabs(it_per_id.feature_per_frame[0].uv.x() - it_per_frame.uv.x()) < 10 &&
+      //   fabs(it_per_id.feature_per_frame[0].uv.y() - it_per_frame.uv.y() < 10))
       {
         if (imu_i != imu_j)
         {
@@ -1276,11 +1282,10 @@ void Estimator::optimization()
                 it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
             problem.AddResidualBlock(f, loss_function, para_Ex_Pose[0], para_Ex_Pose[1], para_Feature[feature_index], para_Td[0]);
           }
-
         }
       }
-      else
-        std::cout << "rejecting points as outliers" << std::endl;
+      //else
+      // std::cout << "rejected as outlier" << std::endl;it_per_frame.uv;
       f_m_cnt++;
     }
   }
@@ -1719,7 +1724,6 @@ void Estimator::outliersRejection(set<int> &removeIndex)
       // need to rewrite projecton factor.........
       if(STEREO && it_per_frame.is_stereo)
       {
-
         Vector3d pts_j_right = it_per_frame.pointRight;
         if(imu_i != imu_j)
         {
@@ -1744,7 +1748,6 @@ void Estimator::outliersRejection(set<int> &removeIndex)
     double ave_err = err / errCnt;
     if(ave_err * FOCAL_LENGTH > 3)
       removeIndex.insert(it_per_id.feature_id);
-
   }
 }
 

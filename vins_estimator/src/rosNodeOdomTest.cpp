@@ -155,11 +155,12 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
 
   nav_msgs::Odometry wh_odom;
   get_wh_odom(wh_odom);
-
   double wh_odom_t = wh_odom.header.stamp.toSec();
-  if(wh_odom_t <= t && fabs(wh_odom.twist.twist.linear.x) < 10)
+  //std::cout  << "wheel odom:" << wh_odom.twist.twist.linear.x << std::endl;
+
+  if(t - wh_odom_t <= 0.05 && fabs(wh_odom.twist.twist.linear.x) < 10)
   {
-    //std::cout << "time diff between odom and imu msg: " << t - wh_odom_t << std::endl;
+    std::cout << "time diff between odom and imu msg: " << t - wh_odom_t << std::endl;
     Eigen::Vector3d vel(0, wh_odom.twist.twist.linear.x, 0);
     estimator.inputIMUWhOdom(t, wh_odom_t, vel, acc, gyr);
     //std::cout << "got odom msg with Imu" << std::endl;
@@ -167,7 +168,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
   else
   {
     estimator.inputIMU(t, acc, gyr);
-    std::cout << "did not get odom msg with Imu" << std::endl;
+    //std::cout << "did not get odom msg with Imu" << std::endl;
   }
 
   return;
