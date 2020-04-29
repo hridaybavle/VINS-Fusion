@@ -109,9 +109,9 @@ void Estimator::setParameter()
     cout << " exitrinsic cam " << i << endl  << ric[i] << endl << tic[i].transpose() << endl;
   }
   f_manager.setRic(ric);
-  ProjectionTwoFrameOneCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
-  ProjectionTwoFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
-  ProjectionOneFrameTwoCamFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
+  ProjectionTwoFrameOneCamFactor::sqrt_info = 100/*FOCAL_LENGTH / 1.5*/ * Matrix2d::Identity();
+  ProjectionTwoFrameTwoCamFactor::sqrt_info = 100/*FOCAL_LENGTH / 1.5*/ * Matrix2d::Identity();
+  ProjectionOneFrameTwoCamFactor::sqrt_info = 100/*FOCAL_LENGTH / 1.5*/ * Matrix2d::Identity();
   td = TD;
   g = G;
   cout << "set g " << g.transpose() << endl;
@@ -564,14 +564,23 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
     Rs_wh *= Utility::deltaQ(un_angvel * dt_wh).toRotationMatrix();
 
     Eigen::Quaterniond quat_wh(Rs_wh);
-    std::cout << "quat_wh: " << quat_wh.x() << "," << quat_wh.y() << "," << quat_wh.z() << "," << quat_wh.w() << std::endl;
     Vector3d un_vel_0 = Rs_wh * vel_0;
     Vector3d un_vel_1 = Rs_wh * linear_vel;
+    Vector3d un_vel = 0.5 * (un_vel_0 + un_vel_1);
 
     //propagating state only using the wheel odom measurements
-    Vector3d un_vel = 0.5 * (un_vel_0 + un_vel_1);
-    Ps[j] += dt_wh * un_vel + 0.5 * dt * dt * un_acc;;
+    std::cout << "dt_wh: "  << dt_wh << std::endl;
+    std::cout << "un vel_0: "  << un_vel_0 << std::endl;
+    std::cout << "un vel_1: "  << un_vel_1 << std::endl;
+    std::cout << "un vel: "    << un_vel << std::endl;
+    std::cout << "Ps before" << "[" << j << "]: " << Ps[j] << std::endl;
+    std::cout << "Vs before" << "[" << j << "]: " << Vs[j] << std::endl;
+    Ps[j] += dt_wh * un_vel + 0.5 * dt * dt * un_acc;
     Vs[j]  = un_vel + dt * un_acc;
+
+    std::cout << "Ps" << "[" << j << "]: " << Ps[j] << std::endl;
+    std::cout << "Vs" << "[" << j << "]: " << Vs[j] << std::endl;
+
   }
   acc_0 = linear_acceleration;
   gyr_0 = angular_velocity;

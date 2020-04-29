@@ -19,7 +19,7 @@ class WhOdomIntegrationBase
 {
   public:
     WhOdomIntegrationBase() = delete;
-    WhOdomIntegrationBase(const Eigen::Vector3d &_vel_0) : vel_0{_vel_0}, delta_p{Eigen::Vector3d::Zero()}, sum_dt{0}
+    WhOdomIntegrationBase(const Eigen::Vector3d &_vel_0) : vel_0{_vel_0}, delta_v{Eigen::Vector3d::Zero()}, sum_dt{0}
     {
 
     }
@@ -33,7 +33,7 @@ class WhOdomIntegrationBase
 
     void repropagate(const Eigen::Vector3d vel)
     {
-      delta_p.setZero();
+      delta_v.setZero();
     }
 
     void propagate(double _dt, const Eigen::Vector3d& _vel_1)
@@ -51,13 +51,13 @@ class WhOdomIntegrationBase
       Vector3d un_vel_1 = _vel_1;
       Vector3d un_vel   = 0.5 * (vel_0 + vel_1);
 
-      delta_p = delta_p + un_vel * dt;
+      //delta_p = delta_p + un_vel * dt;
+      delta_v = un_vel*dt;
       sum_dt += dt;
       vel_0   = _vel_1;
     }
 
-    Eigen::Matrix<double, 3, 1> evaluate(const Eigen::Vector3d &Pi, const Eigen::Vector3d &Vi,
-                                         const Eigen::Vector3d &Pj, const Eigen::Vector3d &Vj)
+    Eigen::Matrix<double, 3, 1> evaluate(const Eigen::Vector3d &Vi, const Eigen::Vector3d &Vj)
     {
       Eigen::Matrix<double, 3, 1> residuals;
 
@@ -71,7 +71,7 @@ class WhOdomIntegrationBase
       meas_avg_vel = meas_avg_vel / vel_buf.size();
       //std::cout << "meas vel:" << meas_avg_vel << std::endl;
 
-      residuals.block<3,1>(0,0) = (Pj - Pi) - delta_p;
+      residuals.block<3,1>(0,0) = (Vj - Vi) - delta_v;
       std::cout << "vel residual:" << residuals << std::endl;
 
       vel_buf.clear();
@@ -82,6 +82,6 @@ class WhOdomIntegrationBase
     double sum_dt;
     std::vector<Eigen::Vector3d> vel_buf;
     Eigen::Vector3d meas_avg_vel;
-    Eigen::Vector3d delta_p;
+    Eigen::Vector3d delta_p, delta_v;
     Eigen::Vector3d vel_0, vel_1;
 };

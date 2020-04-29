@@ -29,7 +29,7 @@ class IntegrationBase
     {
         if(USE_WH_ODOM)
         {
-          //covariance.block<3,3>(0,0) = 0 * Eigen::Matrix3d::Identity();
+          //covariance.block<3,3>(0,0) = 0.1 * Eigen::Matrix3d::Identity();
           //covariance.block<3,3>(6,6) = 0.1 * Eigen::Matrix3d::Identity();
         }
         noise = Eigen::Matrix<double, 18, 18>::Zero();
