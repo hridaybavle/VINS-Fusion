@@ -19,7 +19,7 @@ class WhOdomIntegrationBase
 {
   public:
     WhOdomIntegrationBase() = delete;
-    WhOdomIntegrationBase(const Eigen::Vector3d &_vel_0) : vel_0{_vel_0}, delta_v{Eigen::Vector3d::Zero()}, sum_dt{0}
+    WhOdomIntegrationBase(const Eigen::Vector3d &_vel_0) : vel_0{_vel_0}, delta_p{Eigen::Vector3d::Zero()}, delta_v{Eigen::Vector3d::Zero()}, sum_dt{0}
     {
 
     }
@@ -52,29 +52,37 @@ class WhOdomIntegrationBase
       Vector3d un_vel   = 0.5 * (vel_0 + vel_1);
 
       //delta_p = delta_p + un_vel * dt;
-      delta_v = un_vel*dt;
+      delta_v = un_vel;
       sum_dt += dt;
       vel_0   = _vel_1;
     }
 
-    Eigen::Matrix<double, 3, 1> evaluate(const Eigen::Vector3d &Vi, const Eigen::Vector3d &Vj)
+    Eigen::Matrix<double, 3, 1> evaluate(const Eigen::Vector3d &Pi, const Eigen::Vector3d &Pj)
     {
       Eigen::Matrix<double, 3, 1> residuals;
+      residuals.setZero();
 
-      if(vel_buf.size() == 0)
+      if(sum_dt == 0){
+        std::cout << "returning residuals as dt is 0" << std::endl;
         return residuals;
+      }
+      //      if(vel_buf.size() == 0)
+      //        return residuals;
 
-      for(size_t i = 0; i < vel_buf.size(); ++i)
-      {
-        meas_avg_vel = meas_avg_vel + vel_buf[i];
-      }    
-      meas_avg_vel = meas_avg_vel / vel_buf.size();
-      //std::cout << "meas vel:" << meas_avg_vel << std::endl;
-
-      residuals.block<3,1>(0,0) = (Vj - Vi) - delta_v;
+      //      for(size_t i = 0; i < vel_buf.size(); ++i)
+      //      {
+      //        meas_avg_vel = meas_avg_vel + vel_buf[i];
+      //      }
+      //      meas_avg_vel = meas_avg_vel / vel_buf.size();
+      //      //std::cout << "meas vel:" << meas_avg_vel << std::endl;
+      Eigen::Vector3d pred_v = (Pj - Pi);
+      std::cout << "pred v: " << pred_v << std::endl;
+      std::cout << "delt_v: " << delta_v << std::endl;
+      residuals.block<3,1>(0,0) = pred_v - delta_v*sum_dt;
+      std::cout << "sum_dt: " << sum_dt << std::endl;
       std::cout << "vel residual:" << residuals << std::endl;
 
-      vel_buf.clear();
+      //vel_buf.clear();
       return residuals;
     }
 

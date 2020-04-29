@@ -36,7 +36,7 @@
 #include "../factor/projectionOneFrameTwoCamFactor.h"
 #include "../featureTracker/feature_tracker.h"
 #include "../factor/wheel_odom_factor.h"
-//#include"../factor/wheel_odom_integration_base.h"
+#include"../factor/wheel_odom_integration_base.h"
 
 class Estimator
 {
@@ -135,6 +135,8 @@ public:
     double Headers[(WINDOW_SIZE + 1)];
 
     IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)];
+    WhOdomIntegrationBase *wh_pre_integrations[(WINDOW_SIZE + 1)];
+
     Vector3d acc_0, gyr_0;
 
     Vector3d vel_0, angvel_0;
