@@ -548,6 +548,14 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
     angular_velocity_buf[frame_count].push_back(angular_velocity);
 
     int j = frame_count;
+
+    //imu measurements
+    Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g;
+    Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - Bgs[j];
+    Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix();
+    Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - g;
+    Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
+
     //adding wh odom vel
     Matrix3d Rs_wh = Rs[j];
     //R0_ is the initial camera angle if its tilted
@@ -562,8 +570,8 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
 
     //propagating state only using the wheel odom measurements
     Vector3d un_vel = 0.5 * (un_vel_0 + un_vel_1);
-    Ps[j] += dt_wh * un_vel;
-    Vs[j]  = un_vel;
+    Ps[j] += dt_wh * un_vel + 0.5 * dt * dt * un_acc;;
+    Vs[j]  = un_vel + dt * un_acc;
   }
   acc_0 = linear_acceleration;
   gyr_0 = angular_velocity;
