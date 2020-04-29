@@ -74,8 +74,9 @@ void Estimator::clearState()
     ric[i] = Matrix3d::Identity();
   }
 
-  first_imu = false,
-      sum_of_back = 0;
+  first_imu = false;
+  first_wh_odom = false;
+  sum_of_back = 0;
   sum_of_front = 0;
   frame_count = 0;
   solver_flag = INITIAL;
@@ -219,13 +220,13 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
   }
 }
 
-void Estimator::inputIMUWhOdom(double t, double t_wh, const Vector3d linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)
+void Estimator::inputIMUWhOdom(double t, double t_wh, const Vector3d linearVel, const Vector3d angVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity)
 {
   mBuf.lock();
   accBuf.push(make_pair(t, linearAcceleration));
   gyrBuf.push(make_pair(t, angularVelocity));
   velBuf.push(make_pair(t_wh, linearVel));
-  std::cout << "t_wh callback:" << t_wh << std::endl;
+  angvelBuf.push(make_pair(t_wh, angVel));
   mBuf.unlock();
 
   if (solver_flag == NON_LINEAR)
@@ -284,7 +285,7 @@ bool Estimator::getIMUInterval(double t0, double t1, vector<pair<double, Eigen::
   return true;
 }
 
-bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, Vector3d> > &velVector,
+bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, Vector3d> > &velVector, vector<pair<double, Vector3d> > &angvelVector,
                                       vector<pair<double, Eigen::Vector3d> > &accVector, vector<pair<double, Eigen::Vector3d> > &gyrVector)
 {
   if(accBuf.empty())
@@ -300,8 +301,8 @@ bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, 
     {
       accBuf.pop();
       gyrBuf.pop();
-      if(velBuf.front().first <= t0)
-        velBuf.pop();
+      if(velBuf.front().first <= t0){
+        velBuf.pop(); angvelBuf.pop();}
     }
     while (accBuf.front().first < t1)
     {
@@ -312,13 +313,15 @@ bool Estimator::getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, 
       if(velBuf.front().first < t1 && !velBuf.empty())
       {
         velVector.push_back(velBuf.front());
+        angvelVector.push_back(angvelBuf.front());
         velBuf.pop();
+        angvelBuf.pop();
       }
     }
     accVector.push_back(accBuf.front());
     gyrVector.push_back(gyrBuf.front());
-    if(!velBuf.empty())
-      velVector.push_back(velBuf.front());
+    if(!velBuf.empty()){
+      velVector.push_back(velBuf.front()); angvelVector.push_back(angvelBuf.front());}
   }
   else
   {
@@ -343,7 +346,7 @@ void Estimator::processMeasurements()
     //printf("process measurments\n");
     pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
     vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
-    vector<pair<double, Eigen::Vector3d>> velVec;
+    vector<pair<double, Eigen::Vector3d>> velVec, angvelVector;
     if(!featureBuf.empty())
     {
       feature = featureBuf.front();
@@ -367,7 +370,7 @@ void Estimator::processMeasurements()
       if(USE_IMU && !USE_WH_ODOM)
         getIMUInterval(prevTime, curTime, accVector, gyrVector);
       else
-        getIMUWhOdomeInterval(prevTime, curTime, velVec, accVector, gyrVector);
+        getIMUWhOdomeInterval(prevTime, curTime, velVec, angvelVector, accVector, gyrVector);
       featureBuf.pop();
       mBuf.unlock();
 
@@ -406,7 +409,7 @@ void Estimator::processMeasurements()
           else
           {
             if(i < velVec.size())
-              processIMUWhOdom(accVector[i].first, dt, dt_wh, velVec[i].second, accVector[i].second, gyrVector[i].second);
+              processIMUWhOdom(accVector[i].first, dt, dt_wh, velVec[i].second, angvelVector[i].second, accVector[i].second, gyrVector[i].second);
             else
               processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
           }
@@ -518,14 +521,16 @@ void Estimator::processIMU(double t, double dt, const Vector3d &linear_accelerat
   gyr_0 = angular_velocity;
 }
 
-void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector3d linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
+void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector3d linear_vel, const Vector3d wh_ang_vel,
+                                 const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
 {
-  if (!first_imu)
+  if (!first_wh_odom)
   {
-    first_imu = true;
+    first_wh_odom = true;
     acc_0 = linear_acceleration;
     gyr_0 = angular_velocity;
-    vel_0 = linear_vel;
+    vel_0    = linear_vel;
+    angvel_0 = wh_ang_vel;
   }
 
   if (!pre_integrations[frame_count])
@@ -543,33 +548,27 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
     angular_velocity_buf[frame_count].push_back(angular_velocity);
 
     int j = frame_count;
-    Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g;
-    Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - Bgs[j];
-    Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix();
-    Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - g;
-    Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
     //adding wh odom vel
     Matrix3d Rs_wh = Rs[j];
-    Rs_wh *= Utility::deltaQ(un_gyr * dt_wh).toRotationMatrix();
-    Eigen::Quaterniond trans_Q(Rs_wh * R0_.transpose());
-    Vector3d un_vel_0 = trans_Q * vel_0;
-    Vector3d un_vel_1 = trans_Q * linear_vel;
+    //R0_ is the initial camera angle if its tilted
+    Rs_wh = Rs_wh * R0_.transpose();
+    Vector3d un_angvel = 0.5 * (angvel_0 + wh_ang_vel);
+    Rs_wh *= Utility::deltaQ(un_angvel * dt_wh).toRotationMatrix();
 
+    Eigen::Quaterniond quat_wh(Rs_wh);
+    std::cout << "quat_wh: " << quat_wh.x() << "," << quat_wh.y() << "," << quat_wh.z() << "," << quat_wh.w() << std::endl;
+    Vector3d un_vel_0 = Rs_wh * vel_0;
+    Vector3d un_vel_1 = Rs_wh * linear_vel;
+
+    //propagating state only using the wheel odom measurements
     Vector3d un_vel = 0.5 * (un_vel_0 + un_vel_1);
-    //std::cout << "R0_" << R0_ << std::endl;
-    //std::cout << "trans Q: " << trans_Q.x() << "," << trans_Q.y() << "," << trans_Q.z() << "," << trans_Q.w() << std::endl;
-    //std::cout << "un vel: " << un_vel << std::endl;
-
-    //Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
-    //Vs[j] += dt * un_acc;
-    //Eigen::Vector3d noise = 0.01 * Eigen::Vector3d::Ones();
-    std::cout << "dt_wh inside" << dt_wh << std::endl;
     Ps[j] += dt_wh * un_vel;
     Vs[j]  = un_vel;
   }
   acc_0 = linear_acceleration;
   gyr_0 = angular_velocity;
   vel_0 = linear_vel;
+  angvel_0 = wh_ang_vel;
 }
 
 void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header)

@@ -162,7 +162,8 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
   {
     std::cout << "time diff between odom and imu msg: " << t - wh_odom_t << std::endl;
     Eigen::Vector3d vel(0, wh_odom.twist.twist.linear.x, 0);
-    estimator.inputIMUWhOdom(t, wh_odom_t, vel, acc, gyr);
+    Eigen::Vector3d ang_vel(0, 0, wh_odom.twist.twist.angular.z);
+    estimator.inputIMUWhOdom(t, wh_odom_t, vel, ang_vel, acc, gyr);
     //std::cout << "got odom msg with Imu" << std::endl;
   }
   else

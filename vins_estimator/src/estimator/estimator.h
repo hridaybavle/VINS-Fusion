@@ -48,11 +48,11 @@ public:
     // interface
     void initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r);
     void inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
-    void inputIMUWhOdom(double t, double t_wh, const Vector3d linearVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
+    void inputIMUWhOdom(double t, double t_wh, const Vector3d linearVel, const Vector3d angVel, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
     void inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame);
     void inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
     void processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
-    void processIMUWhOdom(double t, double dt, double dt_wh, const Vector3d linear_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
+    void processIMUWhOdom(double t, double dt, double dt_wh, const Vector3d linear_vel, const Vector3d wh_ang_vel, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
     void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header);
     void processMeasurements();
     void changeSensorType(int use_imu, int use_stereo);
@@ -71,7 +71,7 @@ public:
     bool failureDetection();
     bool getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector,
                         vector<pair<double, Eigen::Vector3d>> &gyrVector);
-    bool getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d> > &velVector, vector<pair<double, Eigen::Vector3d>> &accVector,
+    bool getIMUWhOdomeInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d> > &velVector, vector<pair<double, Vector3d> > &angvelVector, vector<pair<double, Eigen::Vector3d>> &accVector,
                                vector<pair<double, Eigen::Vector3d>> &gyrVector);
     void getPoseInWorldFrame(Eigen::Matrix4d &T);
     void getPoseInWorldFrame(int index, Eigen::Matrix4d &T);
@@ -104,6 +104,8 @@ public:
     queue<pair<double, Eigen::Vector3d>> accBuf;
     queue<pair<double, Eigen::Vector3d>> gyrBuf;
     queue<pair<double, Eigen::Vector3d>> velBuf;
+    queue<pair<double, Eigen::Vector3d>> angvelBuf;
+
     queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > > featureBuf;
     double prevTime, curTime;
     bool openExEstimation;
@@ -135,7 +137,7 @@ public:
     IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)];
     Vector3d acc_0, gyr_0;
 
-    Vector3d vel_0;
+    Vector3d vel_0, angvel_0;
 
     vector<double> dt_buf[(WINDOW_SIZE + 1)];
     vector<Vector3d> linear_acceleration_buf[(WINDOW_SIZE + 1)];
@@ -149,7 +151,7 @@ public:
     MotionEstimator m_estimator;
     InitialEXRotation initial_ex_rotation;
 
-    bool first_imu;
+    bool first_imu, first_wh_odom;
     bool is_valid, is_key;
     bool failure_occur;
 
