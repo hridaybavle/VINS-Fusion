@@ -66,21 +66,13 @@ class WhOdomIntegrationBase
         std::cout << "returning residuals as dt is 0" << std::endl;
         return residuals;
       }
-      //      if(vel_buf.size() == 0)
-      //        return residuals;
 
-      //      for(size_t i = 0; i < vel_buf.size(); ++i)
-      //      {
-      //        meas_avg_vel = meas_avg_vel + vel_buf[i];
-      //      }
-      //      meas_avg_vel = meas_avg_vel / vel_buf.size();
-      //      //std::cout << "meas vel:" << meas_avg_vel << std::endl;
       Eigen::Vector3d pred_v = (Pj - Pi);
-      std::cout << "pred v: " << pred_v << std::endl;
-      std::cout << "delt_v: " << delta_v << std::endl;
+      //std::cout << "pred v: " << pred_v << std::endl;
+      //std::cout << "delt_v: " << delta_v << std::endl;
       residuals.block<3,1>(0,0) = pred_v - delta_v*sum_dt;
-      std::cout << "sum_dt: " << sum_dt << std::endl;
-      std::cout << "vel residual:" << residuals << std::endl;
+      //std::cout << "sum_dt: " << sum_dt << std::endl;
+      //std::cout << "vel residual:" << residuals << std::endl;
 
       //vel_buf.clear();
       return residuals;

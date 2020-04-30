@@ -123,6 +123,7 @@ public:
     Vector3d tic[2];
 
     Vector3d        Ps[(WINDOW_SIZE + 1)];
+    Vector3d        Pw[(WINDOW_SIZE + 1)];
     Vector3d        Vs[(WINDOW_SIZE + 1)];
     Matrix3d        Rs[(WINDOW_SIZE + 1)];
     Vector3d        Bas[(WINDOW_SIZE + 1)];
@@ -156,6 +157,7 @@ public:
     bool first_imu, first_wh_odom;
     bool is_valid, is_key;
     bool failure_occur;
+    bool process_wh_odom;
 
     vector<Vector3d> point_cloud;
     vector<Vector3d> margin_cloud;
@@ -164,6 +166,7 @@ public:
 
 
     double para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
+    double para_Pose_w[WINDOW_SIZE + 1][3];
     double para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
     double para_Feature[NUM_OF_F][SIZE_FEATURE];
     double para_Ex_Pose[2][SIZE_POSE];

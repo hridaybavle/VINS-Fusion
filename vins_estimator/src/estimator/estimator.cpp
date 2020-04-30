@@ -55,6 +55,7 @@ void Estimator::clearState()
   {
     Rs[i].setIdentity();
     Ps[i].setZero();
+    Pw[i].setZero();
     Vs[i].setZero();
     Bas[i].setZero();
     Bgs[i].setZero();
@@ -84,6 +85,7 @@ void Estimator::clearState()
 
   first_imu = false;
   first_wh_odom = false;
+  process_wh_odom = false;
   sum_of_back = 0;
   sum_of_front = 0;
   frame_count = 0;
@@ -588,6 +590,11 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
 
     wh_pre_integrations[j]->push_back(dt_wh, un_vel_1);
 
+    Pw[j] = Ps[j] + dt_wh * un_vel;
+    Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
+    Vs[j] += dt * un_acc;
+    process_wh_odom = true;
+
     //propagating state only using the wheel odom measurements
     //    std::cout << "dt_wh: "  << dt_wh << std::endl;
     //    std::cout << "un vel_0: "  << un_vel_0 << std::endl;
@@ -595,9 +602,7 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
     //    std::cout << "un vel: "    << un_vel << std::endl;
     //    std::cout << "Ps before" << "[" << j << "]: " << Ps[j] << std::endl;
     //    std::cout << "Vs before" << "[" << j << "]: " << Vs[j] << std::endl;
-    //Ps[j] += dt_wh * un_vel + 0.5 * dt * dt * un_acc;
-    //Vs[j]  = un_vel + dt * un_acc;
-
+    //std::cout << "Pw" << "[" << j << "]: " << Pw[j] << std::endl;
     //std::cout << "Ps" << "[" << j << "]: " << Ps[j] << std::endl;
     //std::cout << "Vs" << "[" << j << "]: " << Vs[j] << std::endl;
 
@@ -1028,6 +1033,14 @@ void Estimator::vector2double()
     para_Pose[i][5] = q.z();
     para_Pose[i][6] = q.w();
 
+    if(USE_WH_ODOM)
+    {
+      para_Pose_w[i][0] = Pw[i].x();
+      para_Pose_w[i][1] = Pw[i].y();
+      para_Pose_w[i][2] = Pw[i].z();
+      //std::cout << "para_Pose_w[" << i << "]: "  << para_Pose_w[i][0] << std::endl << para_Pose_w[i][1] << std::endl << para_Pose_w[i][2] << std::endl;
+    }
+
     if(USE_IMU)
     {
       para_SpeedBias[i][0] = Vs[i].x();
@@ -1218,6 +1231,10 @@ void Estimator::optimization()
     problem.AddParameterBlock(para_Pose[i], SIZE_POSE, local_parameterization);
     if(USE_IMU)
       problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
+    if(USE_WH_ODOM && process_wh_odom && i == 10)
+     {
+       problem.AddParameterBlock(para_Pose_w[i], 3);
+     }
   }
   if(!USE_IMU)
     problem.SetParameterBlockConstant(para_Pose[0]);
@@ -1259,17 +1276,24 @@ void Estimator::optimization()
       IMUFactor* imu_factor = new IMUFactor(pre_integrations[j]);
       problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
 
-      if(USE_WH_ODOM && wh_pre_integrations[j])
+      if(USE_WH_ODOM && j == 10 && wh_pre_integrations[j] && process_wh_odom)
       {
         if(wh_pre_integrations[j]->sum_dt > 0)
         {
           ceres::CostFunction* cost_function
-              = new ceres::NumericDiffCostFunction<VelCostFunctor, ceres::CENTRAL, 3, 7, 7>(
+              = new ceres::NumericDiffCostFunction<VelCostFunctor, ceres::CENTRAL, 3, 7, 3>(
                 new VelCostFunctor(wh_pre_integrations[j]));
-          problem.AddResidualBlock(cost_function, NULL, para_Pose[i], para_Pose[j]);
+          problem.AddResidualBlock(cost_function, NULL, para_Pose[i], para_Pose_w[j]);
+
+          //std::cout << "para_Pose_w[" << j << "]: "  << para_Pose_w[j][0] << std::endl << para_Pose_w[j][1] << std::endl << para_Pose_w[j][2] << std::endl;
+          ceres::CostFunction* pose_diff_cost_function
+              = new ceres::NumericDiffCostFunction<PoseDiffCostFunctor, ceres::CENTRAL, 3, 3, 7>(
+                new PoseDiffCostFunctor());
+          problem.AddResidualBlock(pose_diff_cost_function, NULL, para_Pose_w[j], para_Pose[j]);
         }
       }
     }
+    process_wh_odom = false;
   }
 
   int f_m_cnt = 0;
@@ -1569,8 +1593,10 @@ void Estimator::slideWindow()
           std::swap(pre_integrations[i], pre_integrations[i + 1]);
 
           if(USE_WH_ODOM)
+          {
+            Pw[i].swap(Pw[i+1]);
             std::swap(wh_pre_integrations[i], wh_pre_integrations[i + 1]);
-
+          }
           dt_buf[i].swap(dt_buf[i + 1]);
           linear_acceleration_buf[i].swap(linear_acceleration_buf[i + 1]);
           angular_velocity_buf[i].swap(angular_velocity_buf[i + 1]);
@@ -1645,6 +1671,7 @@ void Estimator::slideWindow()
         pre_integrations[WINDOW_SIZE] = new IntegrationBase{acc_0, gyr_0, Bas[WINDOW_SIZE], Bgs[WINDOW_SIZE]};
 
         if(USE_WH_ODOM){
+          Pw[frame_count - 1] = Pw[frame_count];
           delete wh_pre_integrations[WINDOW_SIZE];
           wh_pre_integrations[WINDOW_SIZE] = new WhOdomIntegrationBase{vel_0};
         }
