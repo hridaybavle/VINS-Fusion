@@ -56,6 +56,7 @@ void Estimator::clearState()
     Rs[i].setIdentity();
     Ps[i].setZero();
     Pw[i].setZero();
+    Vw[i].setZero();
     Vs[i].setZero();
     Bas[i].setZero();
     Bgs[i].setZero();
@@ -590,7 +591,8 @@ void Estimator::processIMUWhOdom(double t, double dt, double dt_wh, const Vector
 
     wh_pre_integrations[j]->push_back(dt_wh, un_vel_1);
 
-    Pw[j] = Ps[j] + dt_wh * un_vel;
+    Pw[j] = Ps[j] + dt_wh * un_vel_1;
+    Vw[j] = un_vel_1;
     Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
     Vs[j] += dt * un_acc;
     process_wh_odom = true;
@@ -1038,6 +1040,10 @@ void Estimator::vector2double()
       para_Pose_w[i][0] = Pw[i].x();
       para_Pose_w[i][1] = Pw[i].y();
       para_Pose_w[i][2] = Pw[i].z();
+
+      para_Speed_w[i][0] = Vw[i].x();
+      para_Speed_w[i][1] = Vw[i].y();
+      para_Speed_w[i][2] = Vw[i].z();
       //std::cout << "para_Pose_w[" << i << "]: "  << para_Pose_w[i][0] << std::endl << para_Pose_w[i][1] << std::endl << para_Pose_w[i][2] << std::endl;
     }
 
@@ -1233,7 +1239,7 @@ void Estimator::optimization()
       problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
     if(USE_WH_ODOM && process_wh_odom && i == 10)
      {
-       problem.AddParameterBlock(para_Pose_w[i], 3);
+       //problem.AddParameterBlock(para_Pose_w[i], 3);
      }
   }
   if(!USE_IMU)
@@ -1280,16 +1286,27 @@ void Estimator::optimization()
       {
         if(wh_pre_integrations[j]->sum_dt > 0)
         {
+          //ceres::CostFunction* cost_function
+          //    = new ceres::NumericDiffCostFunction<VelCostFunctor, ceres::CENTRAL, 3, 7, 3>(
+          //      new VelCostFunctor(wh_pre_integrations[j]));
+
+          //          ceres::CostFunction* cost_function
+          //                        = new ceres::AutoDiffCostFunction<AutoDiffPoseCostFunctor, 3, 7, 3>(
+          //                          new AutoDiffPoseCostFunctor(wh_pre_integrations[j]));
+          //          problem.AddResidualBlock(cost_function, NULL, para_Pose[i], para_Pose_w[j]);
+
           ceres::CostFunction* cost_function
-              = new ceres::NumericDiffCostFunction<VelCostFunctor, ceres::CENTRAL, 3, 7, 3>(
-                new VelCostFunctor(wh_pre_integrations[j]));
-          problem.AddResidualBlock(cost_function, NULL, para_Pose[i], para_Pose_w[j]);
+                        = new ceres::AutoDiffCostFunction<AutoDiffVelCostFunctor, 3, 9, 3>(
+                          new AutoDiffVelCostFunctor());
+          problem.AddParameterBlock(para_Speed_w[j], 3);
+          problem.SetParameterBlockConstant(para_Speed_w[j]);
+          problem.AddResidualBlock(cost_function, NULL, para_SpeedBias[j], para_Speed_w[j]);
 
           //std::cout << "para_Pose_w[" << j << "]: "  << para_Pose_w[j][0] << std::endl << para_Pose_w[j][1] << std::endl << para_Pose_w[j][2] << std::endl;
-          ceres::CostFunction* pose_diff_cost_function
-              = new ceres::NumericDiffCostFunction<PoseDiffCostFunctor, ceres::CENTRAL, 3, 3, 7>(
-                new PoseDiffCostFunctor());
-          problem.AddResidualBlock(pose_diff_cost_function, NULL, para_Pose_w[j], para_Pose[j]);
+          //ceres::CostFunction* pose_diff_cost_function
+          //    = new ceres::NumericDiffCostFunction<PoseDiffCostFunctor, ceres::CENTRAL, 3, 3, 7>(
+          //      new PoseDiffCostFunctor());
+          //problem.AddResidualBlock(pose_diff_cost_function, NULL, para_Pose_w[j], para_Pose[j]);
         }
       }
     }
@@ -1595,6 +1612,8 @@ void Estimator::slideWindow()
           if(USE_WH_ODOM)
           {
             Pw[i].swap(Pw[i+1]);
+            Vw[i].swap(Vw[i+1]);
+
             std::swap(wh_pre_integrations[i], wh_pre_integrations[i + 1]);
           }
           dt_buf[i].swap(dt_buf[i + 1]);
@@ -1672,6 +1691,8 @@ void Estimator::slideWindow()
 
         if(USE_WH_ODOM){
           Pw[frame_count - 1] = Pw[frame_count];
+          Vw[frame_count - 1] = Vw[frame_count];
+
           delete wh_pre_integrations[WINDOW_SIZE];
           wh_pre_integrations[WINDOW_SIZE] = new WhOdomIntegrationBase{vel_0};
         }

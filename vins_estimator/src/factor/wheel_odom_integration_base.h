@@ -57,6 +57,11 @@ class WhOdomIntegrationBase
       vel_0   = _vel_1;
     }
 
+    Eigen::Vector3d getMeasP()
+    {
+      return delta_v*sum_dt;
+    }
+
     Eigen::Matrix<double, 3, 1> evaluate(const Eigen::Vector3d &Pi, const Eigen::Vector3d &Pj)
     {
       Eigen::Matrix<double, 3, 1> residuals;

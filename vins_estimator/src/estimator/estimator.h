@@ -124,6 +124,7 @@ public:
 
     Vector3d        Ps[(WINDOW_SIZE + 1)];
     Vector3d        Pw[(WINDOW_SIZE + 1)];
+    Vector3d        Vw[(WINDOW_SIZE + 1)];
     Vector3d        Vs[(WINDOW_SIZE + 1)];
     Matrix3d        Rs[(WINDOW_SIZE + 1)];
     Vector3d        Bas[(WINDOW_SIZE + 1)];
@@ -167,6 +168,7 @@ public:
 
     double para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
     double para_Pose_w[WINDOW_SIZE + 1][3];
+    double para_Speed_w[WINDOW_SIZE + 1][3];
     double para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
     double para_Feature[NUM_OF_F][SIZE_FEATURE];
     double para_Ex_Pose[2][SIZE_POSE];

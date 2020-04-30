@@ -157,7 +157,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
   double wh_odom_t = wh_odom.header.stamp.toSec();
   //std::cout  << "wheel odom:" << wh_odom.twist.twist.linear.x << std::endl;
 
-  if(t - wh_odom_t <= 0.045 && fabs(wh_odom.twist.twist.linear.x) < 10)
+  if(wh_odom_t >= t - 0.045 && wh_odom_t <= t + 0.045 && fabs(wh_odom.twist.twist.linear.x) < 10)
   {
     std::cout << "time diff between odom and imu msg: " << t - wh_odom_t << std::endl;
     Eigen::Vector3d vel(0, wh_odom.twist.twist.linear.x, 0);
