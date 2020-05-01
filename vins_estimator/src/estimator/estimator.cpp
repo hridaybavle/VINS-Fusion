@@ -1238,9 +1238,9 @@ void Estimator::optimization()
     if(USE_IMU)
       problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
     if(USE_WH_ODOM && process_wh_odom && i == 10)
-     {
-       //problem.AddParameterBlock(para_Pose_w[i], 3);
-     }
+    {
+      //problem.AddParameterBlock(para_Pose_w[i], 3);
+    }
   }
   if(!USE_IMU)
     problem.SetParameterBlockConstant(para_Pose[0]);
@@ -1296,10 +1296,10 @@ void Estimator::optimization()
           //          problem.AddResidualBlock(cost_function, NULL, para_Pose[i], para_Pose_w[j]);
 
           ceres::CostFunction* cost_function
-                        = new ceres::AutoDiffCostFunction<AutoDiffVelCostFunctor, 3, 9, 3>(
-                          new AutoDiffVelCostFunctor());
-          problem.AddParameterBlock(para_Speed_w[j], 3);
-          problem.SetParameterBlockConstant(para_Speed_w[j]);
+              = new ceres::AutoDiffCostFunction<AutoDiffVelCostFunctor, 3, 9, 3>(
+                new AutoDiffVelCostFunctor());
+          //problem.AddParameterBlock(para_Speed_w[j], 3);
+          //problem.SetParameterBlockConstant(para_Speed_w[j]);
           problem.AddResidualBlock(cost_function, NULL, para_SpeedBias[j], para_Speed_w[j]);
 
           //std::cout << "para_Pose_w[" << j << "]: "  << para_Pose_w[j][0] << std::endl << para_Pose_w[j][1] << std::endl << para_Pose_w[j][2] << std::endl;
@@ -1325,17 +1325,51 @@ void Estimator::optimization()
 
     int imu_i = it_per_id.start_frame, imu_j = imu_i - 1;
 
+    //std::cout << "feature id" << it_per_id.feature_id << "start frame: " << imu_i << std::endl;
+
     Vector3d pts_i = it_per_id.feature_per_frame[0].point;
 
     for (auto &it_per_frame : it_per_id.feature_per_frame)
     {
       imu_j++;
       //dont optimize points which have really high displacement
-      //std::cout << "it_per_id.feature_per_frame[0].uv " << it_per_id.feature_per_frame[0].uv << std::endl;
-      //std::cout << "it_per_frame.uv " << it_per_frame.uv << std::endl;
+      //      std::cout << "it_per_id.feature_per_frame size" << it_per_id.feature_per_frame.size() << std::endl;
+      //      std::cout << "image distance: " << imu_j - imu_i << std::endl;
+      //      std::cout << "it_per_id.feature_per_frame[0].uv " << it_per_id.feature_per_frame[0].uv << std::endl;
+      //      std::cout << "it_per_frame.uv " << it_per_frame.uv << std::endl;
 
-      //if(fabs(it_per_id.feature_per_frame[0].uv.x() - it_per_frame.uv.x()) < 10 &&
-      //   fabs(it_per_id.feature_per_frame[0].uv.y() - it_per_frame.uv.y() < 10))
+      if(imu_j - imu_i < 4 && fabs(it_per_id.feature_per_frame[0].uv.x() - it_per_frame.uv.x()) < 10 &&
+         fabs(it_per_id.feature_per_frame[0].uv.y() - it_per_frame.uv.y() < 10))
+      {
+        if (imu_i != imu_j)
+        {
+          Vector3d pts_j = it_per_frame.point;
+          ProjectionTwoFrameOneCamFactor *f_td = new ProjectionTwoFrameOneCamFactor(pts_i, pts_j, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocity,
+              it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
+          problem.AddResidualBlock(f_td, loss_function, para_Pose[imu_i], para_Pose[imu_j], para_Ex_Pose[0], para_Feature[feature_index], para_Td[0]);
+
+        }
+
+        if(STEREO && it_per_frame.is_stereo)
+        {
+          Vector3d pts_j_right = it_per_frame.pointRight;
+
+          if(imu_i != imu_j)
+          {
+            ProjectionTwoFrameTwoCamFactor *f = new ProjectionTwoFrameTwoCamFactor(pts_i, pts_j_right, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocityRight,
+                it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
+            problem.AddResidualBlock(f, loss_function, para_Pose[imu_i], para_Pose[imu_j], para_Ex_Pose[0], para_Ex_Pose[1], para_Feature[feature_index], para_Td[0]);
+          }
+          else
+          {
+            ProjectionOneFrameTwoCamFactor *f = new ProjectionOneFrameTwoCamFactor(pts_i, pts_j_right, it_per_id.feature_per_frame[0].velocity, it_per_frame.velocityRight,
+                it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td);
+            problem.AddResidualBlock(f, loss_function, para_Ex_Pose[0], para_Ex_Pose[1], para_Feature[feature_index], para_Td[0]);
+          }
+        }
+      }
+      else if(imu_j - imu_i > 4 && fabs(it_per_id.feature_per_frame[0].uv.x() - it_per_frame.uv.x()) < 15 &&
+              fabs(it_per_id.feature_per_frame[0].uv.y() - it_per_frame.uv.y() < 15))
       {
         if (imu_i != imu_j)
         {
@@ -1365,7 +1399,7 @@ void Estimator::optimization()
         }
       }
       //else
-      // std::cout << "rejected as outlier" << std::endl;it_per_frame.uv;
+      //  std::cout << "rejected as outlier" << std::endl;
       f_m_cnt++;
     }
   }

@@ -64,7 +64,7 @@ public:
     residuals[1] = (y[1] - x[1]);
     residuals[2] = (y[2] - x[2]);
 
-    std::cout << "pose residuals: " << residuals[0] << std::endl << residuals[1] << std::endl << residuals[2] << std::endl;
+    //std::cout << "pose residuals: " << residuals[0] << std::endl << residuals[1] << std::endl << residuals[2] << std::endl;
 
     return true;
   }
@@ -115,7 +115,7 @@ public:
                   const T* const y,
                   T* residuals) const {
 
-    double var = 0.009;
+    double var = 0.09;
     residuals[0] = (x[0] -  y[0])/ var;
     residuals[1] = (x[1] -  y[1])/ var;
     residuals[2] = (x[2] -  y[2])/ var;
