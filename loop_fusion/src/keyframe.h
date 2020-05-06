@@ -25,7 +25,7 @@
 #include "ThirdParty/DVision/DVision.h"
 
 #define MIN_LOOP_NUM 10
-#define T_THRES  10
+#define T_THRES  20
 #define YAW_THRES 20
 
 using namespace Eigen;

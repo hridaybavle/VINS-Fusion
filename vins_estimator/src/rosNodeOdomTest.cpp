@@ -29,6 +29,8 @@ queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
 std::mutex m_buf;
 nav_msgs::Odometry wh_odom_g;
+std::vector<geometry_msgs::PoseStamped> laser_pose_vec;
+ros::Publisher laser_path_pub;
 
 void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
@@ -272,6 +274,17 @@ void cam_switch_callback(const std_msgs::BoolConstPtr &switch_msg)
   return;
 }
 
+void laser_pose_callback(const geometry_msgs::PoseStamped& msg)
+{
+    laser_pose_vec.push_back(msg);
+
+    nav_msgs::Path laser_path;
+    laser_path.header.stamp    = msg.header.stamp;
+    laser_path.header.frame_id = "world"; 
+    laser_path.poses           = laser_pose_vec;
+    laser_path_pub.publish(laser_path);
+}
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "vins_estimator");
@@ -311,6 +324,9 @@ int main(int argc, char **argv)
   ros::Subscriber sub_restart    = n.subscribe("/vins_restart", 100, restart_callback);
   ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);
   ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);
+  ros::Subscriber sub_laser_pose = n.subscribe("/slam_out_pose", 100, laser_pose_callback);
+
+  laser_path_pub                 = n.advertise<nav_msgs::Path>("/slam_out_path",1);
 
   std::thread sync_thread{sync_process};
   ros::spin();

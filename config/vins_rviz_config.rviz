@@ -9,6 +9,7 @@ Panels:
         - /LoopGroup1
         - /VIOGroup1
         - /GlobalGroup1/CarModel1
+        - /Path1
       Splitter Ratio: 0.465115994
     Tree Height: 409
   - Class: rviz/Selection
@@ -324,6 +325,29 @@ Visualization Manager:
           Value: true
       Enabled: true
       Name: GlobalGroup
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 255; 0; 0
+      Enabled: true
+      Head Diameter: 0.300000012
+      Head Length: 0.200000003
+      Length: 0.300000012
+      Line Style: Billboards
+      Line Width: 0.300000012
+      Name: Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.0299999993
+      Shaft Diameter: 0.100000001
+      Shaft Length: 0.100000001
+      Topic: /slam_out_path
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
@@ -347,25 +371,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 20.3510704
+      Distance: 20.2960186
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.389283895
-        Y: -1.8505919
+        X: 1.91508031
+        Y: -0.706919193
         Z: 0.381431252
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 1.56479514
+      Pitch: 1.55479634
       Target Frame: world
       Value: ThirdPersonFollower (rviz)
-      Yaw: 4.61517286
+      Yaw: 3.15017533
     Saved: ~
 Window Geometry:
   Displays:
